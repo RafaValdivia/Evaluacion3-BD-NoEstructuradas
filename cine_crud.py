@@ -6,6 +6,7 @@ client = MongoClient('mongodb://localhost:27017/')
 db = client['cine_db']
 collection = db['peliculas']
 
+# Aquí se agregan los 8 documentos de películas para no empezar vacío y poder probar.
 def inicializar_datos():
     collection.drop()
     peliculas_data = [
@@ -77,26 +78,38 @@ def inicializar_datos():
     # Se usa insert_many cumpliendo con el criterio "Create" de la rúbrica
     collection.insert_many(peliculas_data)
 
+# Aquí se pregunta si quieres hacer lo mismo otra vez o salir al menú principal.
 def preguntar_continuar(accion_repetir):
     # Función auxiliar para preguntar con menú numérico si desea repetir
+    
+    # El 'while True' hace que el código repita la pregunta por siempre hasta que respondas bien.
     while True:
         print(f"\n1. {accion_repetir}")
         print("2. Volver al menú principal")
         opcion = input("Selecciona la opción: ").strip()
+        
+        # El 'if' pregunta si escribiste "1".
         if opcion == "1":
             return True
+        # El 'elif' pregunta si escribiste "2", pero solo si falló el 'if' de arriba.
         elif opcion == "2":
             return False
+        # El 'else' atrapa cualquier otra cosa equivocada que hayas escrito (letras, otros números).
         else:
             print("Opción inválida. Intenta nuevamente.")
 
 # --- OPERACIONES CRUD ---
 
+# Aquí se crea y guarda una película nueva con los datos que tú escribes.
 def crear_pelicula():
     while True:
         print("\n--- 1. CREAR NUEVA PELÍCULA ---")
+        
+        # El 'try' intenta ejecutar el código sin problemas.
+        # Si algo falla, pasará automáticamente al 'except' más abajo.
         try:
             titulo = input("Título (ej. 'Spiderman', no debe estar vacío): ").strip()
+            # El 'if not' revisa si dejaste el texto completamente vacío.
             if not titulo:
                 print("Formato no válido, respete las indicaciones.")
                 continue
@@ -140,17 +153,22 @@ def crear_pelicula():
             collection.insert_one(nueva_pelicula)
             print(f"¡Película '{titulo}' insertada exitosamente!")
         except ValueError:
+            # Si alguien escribió letras en donde iban números (como el precio), cae aquí y no se rompe.
             print("Formato no válido, respete las indicaciones.")
         
+        # El 'if not' revisa si elegiste NO continuar (opción 2) para romper el ciclo usando 'break'.
         if not preguntar_continuar("Crear otra película"):
             break
 
+# Aquí se busca la lista de todas las películas guardadas y se muestran en pantalla.
 def listar_peliculas():
     while True:
         print("\n--- 2. LISTAR PELÍCULAS ---")
         # Se aplica PROYECCIÓN limitando los campos, cumpliendo con la rúbrica
         proyeccion = {"_id": 0, "titulo": 1, "genero": 1, "fecha_estreno": 1, "duracion_minutos": 1}
         peliculas = collection.find({}, proyeccion)
+        
+        # El 'for' significa "por cada película que encontraste, haz lo siguiente:"
         for p in peliculas:
             fecha_str = p['fecha_estreno'].strftime('%Y-%m-%d')
             print(f"- {p['titulo']} | Género: {p['genero']} | Estreno: {fecha_str} | Duración: {p['duracion_minutos']} min")
@@ -158,6 +176,7 @@ def listar_peliculas():
         if not preguntar_continuar("Listar nuevamente"):
             break
 
+# Aquí se buscan las películas que duren más tiempo del que tú le pidas.
 def buscar_por_comparacion():
     while True:
         print("\n--- 3. BUSCAR POR DURACIÓN MAYOR A ($gt) ---")
@@ -167,6 +186,8 @@ def buscar_por_comparacion():
             proyeccion = {"_id": 0, "titulo": 1, "duracion_minutos": 1}
             peliculas = collection.find({"duracion_minutos": {"$gt": minutos}}, proyeccion)
             encontradas = list(peliculas)
+            
+            # El 'if encontradas' revisa si la lista tiene por lo menos un resultado adentro.
             if encontradas:
                 for p in encontradas:
                     print(f"- {p['titulo']} dura {p['duracion_minutos']} minutos.")
@@ -178,6 +199,7 @@ def buscar_por_comparacion():
         if not preguntar_continuar("Realizar otra búsqueda por duración"):
             break
 
+# Aquí se busca una película escribiendo solo un pedacito de su nombre.
 def buscar_por_regex():
     while True:
         print("\n--- 4. BUSCAR POR TÍTULO PARCIAL (Regex) ---")
@@ -195,6 +217,7 @@ def buscar_por_regex():
         if not preguntar_continuar("Realizar otra búsqueda por título"):
             break
 
+# Aquí se buscan películas que salieron entre dos fechas que tú elijas.
 def buscar_por_fecha():
     while True:
         print("\n--- 5. BUSCAR POR RANGO DE FECHAS ---")
@@ -219,6 +242,7 @@ def buscar_por_fecha():
         if not preguntar_continuar("Realizar otra búsqueda por fechas"):
             break
 
+# Aquí se busca qué películas se van a pasar en una sala específica (ej. Sala 1).
 def buscar_en_subdocumento():
     while True:
         print("\n--- 6. BUSCAR POR SALA (Dentro del Array) ---")
@@ -236,6 +260,7 @@ def buscar_en_subdocumento():
         if not preguntar_continuar("Realizar otra búsqueda por sala"):
             break
 
+# Aquí se cambia el género de una película usando su nombre exacto.
 def actualizar_raiz():
     while True:
         print("\n--- 7. ACTUALIZAR CAMPO RAÍZ (Género) ---")
@@ -243,6 +268,8 @@ def actualizar_raiz():
         nuevo_genero = input("Ingresa el nuevo género: ")
         
         resultado = collection.update_one({"titulo": titulo}, {"$set": {"genero": nuevo_genero}})
+        
+        # Revisa si realmente se modificó alguna película o si nadie cambió de género.
         if resultado.modified_count > 0:
             print(f"¡El género de '{titulo}' ha sido actualizado a '{nuevo_genero}'!")
         else:
@@ -251,6 +278,7 @@ def actualizar_raiz():
         if not preguntar_continuar("Actualizar el género de otra película"):
             break
 
+# Aquí se cambia el precio escondido en los datos de una película usando su nombre.
 def actualizar_subdocumento():
     while True:
         print("\n--- 8. ACTUALIZAR SUBDOCUMENTO (Precio General) ---")
@@ -268,6 +296,7 @@ def actualizar_subdocumento():
         if not preguntar_continuar("Actualizar el precio de otra película"):
             break
 
+# Aquí se borra una película para siempre usando su nombre exacto.
 def eliminar_documento():
     while True:
         print("\n--- 9. ELIMINAR PELÍCULA ---")
@@ -286,6 +315,7 @@ def eliminar_documento():
         if not preguntar_continuar("Eliminar otra película"):
             break
 
+# Aquí la base de datos hace los cálculos sola y ordena las películas por género.
 def reporte_agrupacion():
     while True:
         print("\n--- 10. REPORTE (Pipeline de Agregación) ---")
@@ -307,10 +337,12 @@ def reporte_agrupacion():
         if not preguntar_continuar("Generar reporte nuevamente"):
             break
 
+# Aquí se dibuja el menú principal y se revisa qué número elegiste para llamar a la función correcta.
 def menu_principal():
     if collection.count_documents({}) == 0:
         inicializar_datos()
 
+    # El 'while True' mantiene el menú pegado en la pantalla hasta que elijas la opción de "0" (Salir).
     while True:
         print("\n" + "="*45)
         print("          BASE DE DATOS DE CINE")
@@ -330,6 +362,7 @@ def menu_principal():
         
         opcion = input("Elige una opción: ")
         
+        # Aquí hay varios 'if' y 'elif' en escalera para ver qué botón tocaste y mandarte allí.
         if opcion == "1":
             crear_pelicula()
         elif opcion == "2":
@@ -351,6 +384,7 @@ def menu_principal():
         elif opcion == "10":
             reporte_agrupacion()
         elif opcion == "0":
+            # El 'break' sirve para romper el ciclo infinito del 'while True' y salir del programa.
             print("Saliendo del sistema...")
             break
         else:
