@@ -1,91 +1,35 @@
-# Mi Proyecto del Cine
+# Sistema de Gestión de Cine (ProyectoCine)
 
-Programa para guardar películas usando Python y MongoDB.
+Sistema de gestión de cartelera y películas implementado en Python y MongoDB.
 
-## Requisitos
-Instala estas 3 cosas:
-1. Python.
-2. MongoDB (debe estar prendido en el puerto 27017).
-3. Pymongo (librería de Python).
+## Requisitos del Sistema
+- Python 3.x
+- MongoDB (ejecutándose en `localhost:27017`)
+- Librería `pymongo`
 
----
+## Instrucciones de Instalación
+1. Clonar o acceder al directorio del proyecto:
+   `cd Desktop/proyectocine/Evaluacion3-BD-NoEstructuradas`
+2. Instalar las dependencias necesarias:
+   `pip install pymongo`
+3. Ejecutar la aplicación:
+   `python ProyectoCine.py`
 
-## ¿Cómo iniciar el programa?
-1. Abre tu terminal.
-2. Entra a la carpeta del proyecto usando el comando `cd`.
-   Ejemplo:
-   > `cd Desktop/proyectocine/Evaluacion3-BD-NoEstructuradas`
-3. Instala lo que falta con este comando:
-   > `pip install pymongo`
-4. Ejecuta el programa con este comando:
-   > `python cine_crud.py`
+*(Nota: En la primera ejecución, la base de datos se inicializará automáticamente con 8 registros de prueba).*
 
-*(Nota: La primera vez se guardan solas 8 películas de prueba).*
+## Uso de la Aplicación
+El sistema funciona a través de un menú interactivo por consola. 
 
----
+### Opciones Disponibles:
 
-## ¿Cómo usar el Menú?
-Escribe el número de la opción que quieres y presiona **ENTER**.
-- Si te equivocas, dice "Formato no válido" y te deja intentar de nuevo.
-- Al terminar algo, presiona `1` para repetir o `2` para volver al inicio.
-
----
-
-## Opciones del Menú
-
-### 1. Crear película
-Te pide escribir datos paso a paso:
-- **Título:** Escribe letras (Ejemplo: Spiderman).
-- **Género:** Escribe letras (Ejemplo: Acción).
-- **Duración:** Escribe solo números (Ejemplo: 120).
-- **Fecha de estreno:** Escribe Año-Mes-Día (Ejemplo: 2024-12-31).
-- **Precio entrada general:** Escribe solo números (Ejemplo: 5000).
-- **Precio entrada niño:** Escribe solo números (Ejemplo: 3000).
-- **Sala:** Escribe letras (Ejemplo: Sala 1).
-- **Horario:** Escribe la hora (Ejemplo: 15:00).
-- **Idioma:** Escribe letras (Ejemplo: Doblada).
-
-### 2. Listar películas
-Solo muestra la lista de todas las películas guardadas (título, género, fecha y duración).
-
-### 3. Buscar por duración
-Te pide un número de minutos.
-- Ejemplo: Escribe `130`.
-- Resultado: Muestra películas que duran más de 130 minutos.
-
-### 4. Buscar por título
-Te pide letras.
-- Ejemplo: Escribe `pad`.
-- Resultado: Encuentra "El Padrino" (no importa si usas mayúsculas o minúsculas).
-
-### 5. Buscar por fechas
-Te pide dos fechas (Año-Mes-Día).
-- Ejemplo inicio: `2000-01-01`
-- Ejemplo fin: `2020-12-31`
-- Resultado: Muestra películas que salieron en esos años.
-
-### 6. Buscar por sala
-Te pide el nombre de una sala.
-- Ejemplo: Escribe `Sala 1`.
-- Resultado: Muestra qué películas se ven en esa sala.
-
-### 7. Actualizar Género
-1. Escribe el título exacto de la película.
-2. Escribe el género nuevo.
-- Resultado: Se guarda el nuevo género.
-
-### 8. Actualizar Precio
-1. Escribe el título exacto de la película.
-2. Escribe el nuevo precio (solo números).
-- Resultado: Se guarda el nuevo precio.
-
-### 9. Eliminar película
-1. Escribe el título exacto de la película.
-2. El programa pregunta si estás seguro.
-3. Escribe `si` y presiona ENTER para borrarla.
-
-### 10. Reporte por Género
-No tienes que escribir nada. Agrupa las películas, te dice el promedio de tiempo y las ordena de mayor a menor.
-
-### 0. Salir
-Cierra el programa.
+1. **Crear película**: Permite ingresar un nuevo registro a la base de datos. Requiere completar los campos de título, género, duración, fecha de estreno, precios (general/niño) e información de la función (sala, horario e idioma).
+2. **Listar películas**: Muestra todos los registros almacenados en la colección, incluyendo título, género, fecha de estreno y duración.
+3. **Buscar por duración**: Filtra y muestra las películas cuya duración en minutos sea mayor al valor ingresado ($gt).
+4. **Buscar por título**: Realiza una búsqueda mediante expresiones regulares (Regex) para encontrar coincidencias parciales en los títulos.
+5. **Buscar por fechas**: Muestra las películas estrenadas dentro de un rango de fechas especificado.
+6. **Buscar por sala**: Busca coincidencias dentro de los subdocumentos de funciones para mostrar qué películas se proyectan en una sala específica.
+7. **Actualizar Género**: Modifica el campo raíz 'género' de un documento existente en base a su título exacto.
+8. **Actualizar Precio**: Modifica un valor anidado (precio general) dentro del subdocumento 'entradas'.
+9. **Eliminar película**: Elimina un documento completo de la colección de manera permanente.
+10. **Reporte por Género**: Genera un reporte utilizando un pipeline de agregación de MongoDB, mostrando el promedio de duración agrupado por género y ordenando los resultados.
+0. **Salir**: Finaliza la ejecución del programa.
