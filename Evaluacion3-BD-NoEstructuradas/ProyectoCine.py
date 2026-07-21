@@ -1,10 +1,22 @@
 from pymongo import MongoClient
+import pymongo.errors
 from datetime import datetime
 
-# Conexión a MongoDB local
-client = MongoClient('mongodb://localhost:27017/')
-db = client['cine_db']
-collection = db['peliculas']
+# Intentar conectar a MongoDB local; si no está activo, usar mongomock (emulador en memoria)
+try:
+    client = MongoClient('mongodb://localhost:27017/', serverSelectionTimeoutMS=2000)
+    # Validar conexión
+    client.server_info()
+    db = client['cine_db']
+    collection = db['peliculas']
+    print("-> [SISTEMA] Conectado exitosamente al servidor MongoDB local.")
+except (pymongo.errors.ServerSelectionTimeoutError, Exception):
+    print("-> [SISTEMA] El servidor local de MongoDB no está activo o no es compatible con el procesador.")
+    print("-> [SISTEMA] Iniciando emulador de MongoDB en memoria (mongomock)...")
+    import mongomock
+    client = mongomock.MongoClient()
+    db = client['cine_db']
+    collection = db['peliculas']
 
 # Inicializar base de datos con documentos de prueba (Mínimo 8 documentos)
 def inicializar_datos(): 
@@ -98,26 +110,26 @@ def crear_pelicula():
     while True:
         print("\n--- 1. CREAR NUEVA PELÍCULA ---")
         try:
-            titulo = input("Título (ej. 'Spiderman', no debe estar vacío): ").strip()
+            titulo = input("Título [EJ: 'Spiderman'] (no debe estar vacío): ").strip()
             if not titulo:
                 print("Formato no válido, respete las indicaciones.")
                 continue
 
-            genero = input("Género (ej. 'Acción', no debe estar vacío): ").strip()
+            genero = input("Género [EJ: 'Acción'] (no debe estar vacío): ").strip()
             if not genero:
                 print("Formato no válido, respete las indicaciones.")
                 continue
 
-            duracion = int(input("Duración (solo ingresa los minutos, ej. 120): "))
-            fecha_str = input("Fecha de estreno (YYYY-MM-DD, ej. 2024-12-31): ")
+            duracion = int(input("Duración (minutos) [EJ: 120]: "))
+            fecha_str = input("Fecha de estreno (AAAA-MM-DD) [EJ: '2024-12-31'] (no debe estar vacío): ")
             fecha = datetime.strptime(fecha_str, "%Y-%m-%d")
             
-            precio_gen = int(input("Precio entrada general (solo números, ej. 5000): "))
-            precio_nino = int(input("Precio entrada niño (solo números, ej. 3000): "))
+            precio_gen = int(input("Precio entrada general [EJ: 5000]: "))
+            precio_nino = int(input("Precio entrada niño [EJ: 3000]: "))
             
-            sala = input("Sala (ej. 'Sala 1', no debe estar vacío): ").strip()
-            horario = input("Horario (ej. '15:00', no debe estar vacío): ").strip()
-            idioma = input("Idioma (ej. 'Doblada', no debe estar vacío): ").strip()
+            sala = input("Sala [EJ: 'Sala 1'] (no debe estar vacío): ").strip()
+            horario = input("Horario (HH:MM) [EJ: '15:00'] (no debe estar vacío): ").strip()
+            idioma = input("Idioma [EJ: 'Doblada'] (no debe estar vacío): ").strip()
             
             if not sala or not horario or not idioma:
                 print("Formato no válido, respete las indicaciones.")
@@ -163,7 +175,7 @@ def buscar_por_comparacion():
     while True:
         print("\n--- 3. BUSCAR POR DURACIÓN MAYOR A ($gt) ---")
         try:
-            minutos = int(input("Ingresa la duración mínima en minutos (ej. 130): "))
+            minutos = int(input("Ingresa la duración mínima en minutos [EJ: 130]: "))
             proyeccion = {"_id": 0, "titulo": 1, "duracion_minutos": 1}
             peliculas = collection.find({"duracion_minutos": {"$gt": minutos}}, proyeccion)
             encontradas = list(peliculas)
@@ -182,7 +194,7 @@ def buscar_por_comparacion():
 def buscar_por_regex():
     while True:
         print("\n--- 4. BUSCAR POR TÍTULO PARCIAL (Regex) ---")
-        texto = input("Ingresa parte del título (ej. 'pad' para El Padrino): ")
+        texto = input("Ingresa parte del título [EJ: 'pad']: ")
         proyeccion = {"_id": 0, "titulo": 1, "genero": 1}
         peliculas = collection.find({"titulo": {"$regex": texto, "$options": "i"}}, proyeccion)
         encontradas = list(peliculas)
@@ -199,8 +211,8 @@ def buscar_por_fecha():
     while True:
         print("\n--- 5. BUSCAR POR RANGO DE FECHAS ---")
         try:
-            inicio_str = input("Fecha de inicio (YYYY-MM-DD, ej. 2000-01-01): ")
-            fin_str = input("Fecha de fin (YYYY-MM-DD, ej. 2020-12-31): ")
+            inicio_str = input("Fecha de inicio (AAAA-MM-DD) [EJ: '2000-01-01']: ")
+            fin_str = input("Fecha de fin (AAAA-MM-DD) [EJ: '2020-12-31']: ")
             fecha_inicio = datetime.strptime(inicio_str, "%Y-%m-%d")
             fecha_fin = datetime.strptime(fin_str, "%Y-%m-%d")
             
@@ -221,7 +233,7 @@ def buscar_por_fecha():
 def buscar_en_subdocumento():
     while True:
         print("\n--- 6. BUSCAR POR SALA (Dentro del Array) ---")
-        sala_buscar = input("Ingresa la sala a buscar (ej. Sala 1): ")
+        sala_buscar = input("Ingresa la sala a buscar [EJ: 'Sala 1']: ")
         proyeccion = {"_id": 0, "titulo": 1, "funciones": 1}
         peliculas = collection.find({"funciones.sala": sala_buscar}, proyeccion)
         encontradas = list(peliculas)
@@ -237,7 +249,7 @@ def buscar_en_subdocumento():
 def actualizar_raiz():
     while True:
         print("\n--- 7. ACTUALIZAR CAMPO RAÍZ (Género) ---")
-        titulo = input("Ingresa el título exacto de la película a actualizar: ")
+        titulo = input("Ingresa el título exacto de la película a actualizar [EJ: 'Inception']: ")
         
         # [REQUISITO DESTACADO] Buscar y mostrar el documento ANTES de modificar
         antes = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "genero": 1})
@@ -248,7 +260,7 @@ def actualizar_raiz():
             continue
             
         print(f"[ESTADO ANTES]: {antes}")
-        nuevo_genero = input("Ingresa el nuevo género: ")
+        nuevo_genero = input("Ingresa el nuevo género [EJ: 'Acción y Suspenso']: ")
         
         collection.update_one({"titulo": titulo}, {"$set": {"genero": nuevo_genero}})
         
@@ -263,7 +275,7 @@ def actualizar_raiz():
 def actualizar_subdocumento():
     while True:
         print("\n--- 8. ACTUALIZAR SUBDOCUMENTO (Precio General) ---")
-        titulo = input("Ingresa el título exacto de la película: ")
+        titulo = input("Ingresa el título exacto de la película [EJ: 'The Matrix']: ")
         
         # [REQUISITO DESTACADO] Buscar y mostrar el documento ANTES de modificar
         antes = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "entradas.precio_general": 1})
@@ -275,7 +287,7 @@ def actualizar_subdocumento():
             
         print(f"[ESTADO ANTES]: {antes}")
         try:
-            nuevo_precio = int(input("Ingresa el nuevo precio general (solo números): "))
+            nuevo_precio = int(input("Ingresa el nuevo precio general [EJ: 4900]: "))
             collection.update_one({"titulo": titulo}, {"$set": {"entradas.precio_general": nuevo_precio}})
             
             # [REQUISITO DESTACADO] Buscar y mostrar el documento DESPUÉS de modificar
@@ -291,14 +303,14 @@ def actualizar_subdocumento():
 def eliminar_documento():
     while True:
         print("\n--- 9. ELIMINAR PELÍCULA ---")
-        titulo = input("Ingresa el título exacto de la película a eliminar: ")
+        titulo = input("Ingresa el título exacto de la película a eliminar [EJ: 'Shrek']: ")
         
         # [REQUISITO DESTACADO] Mostrar el documento que se va a eliminar antes de procesar
         pelicula_a_borrar = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "genero": 1, "duracion_minutos": 1})
         
         if pelicula_a_borrar:
             print(f"\n[DOCUMENTO ENCONTRADO]: {pelicula_a_borrar}")
-            confirmacion = input(f"¿Estás seguro de eliminar '{titulo}'? (si/no): ").lower()
+            confirmacion = input(f"¿Estás seguro de eliminar '{titulo}'? (si/no) [EJ: 'si']: ").lower()
             
             if confirmacion == "si":
                 collection.delete_one({"titulo": titulo})
@@ -322,12 +334,18 @@ def reporte_agrupacion():
                 "duracion_promedio": {"$avg": "$duracion_minutos"},
                 "cantidad_peliculas": {"$sum": 1}
             }},
-            {"$sort": {"duracion_promedio": -1}}
+            {"$sort": {"duracion_promedio": -1}},
+            {"$project": {
+                "genero": "$_id",
+                "duracion_promedio": 1,
+                "cantidad_peliculas": 1,
+                "_id": 0
+            }}
         ]
         
         resultados = collection.aggregate(pipeline)
         for r in resultados:
-            print(f"Género: {r['_id']} | Promedio: {round(r['duracion_promedio'], 1)} min | Películas: {r['cantidad_peliculas']}")
+            print(f"Género: {r['genero']} | Promedio: {round(r['duracion_promedio'], 1)} min | Películas: {r['cantidad_peliculas']}")
             
         if not preguntar_continuar("Generar reporte nuevamente"):
             break
