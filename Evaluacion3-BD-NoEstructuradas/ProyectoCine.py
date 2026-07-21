@@ -1,3 +1,4 @@
+import re
 from pymongo import MongoClient
 import pymongo.errors
 from datetime import datetime
@@ -10,13 +11,18 @@ try:
     db = client['cine_db']
     collection = db['peliculas']
     print("-> [SISTEMA] Conectado exitosamente al servidor MongoDB local.")
-except (pymongo.errors.ServerSelectionTimeoutError, Exception):
-    print("-> [SISTEMA] El servidor local de MongoDB no está activo o no es compatible con el procesador.")
-    print("-> [SISTEMA] Iniciando emulador de MongoDB en memoria (mongomock)...")
-    import mongomock
-    client = mongomock.MongoClient()
-    db = client['cine_db']
-    collection = db['peliculas']
+except Exception:
+    print("-> [SISTEMA] El servidor local de MongoDB no está activo o no es alcanzable.")
+    try:
+        import mongomock
+        print("-> [SISTEMA] Iniciando emulador de MongoDB en memoria (mongomock)...")
+        client = mongomock.MongoClient()
+        db = client['cine_db']
+        collection = db['peliculas']
+    except ModuleNotFoundError:
+        print("-> [ERROR] Para ejecutar sin un servidor MongoDB local activo, por favor instala 'mongomock':")
+        print("->         pip install mongomock")
+        raise
 
 # Inicializar base de datos con documentos de prueba (Mínimo 8 documentos)
 def inicializar_datos(): 
@@ -90,6 +96,12 @@ def inicializar_datos():
         ]
         collection.insert_many(peliculas_data)
         print("-> Precarga de 8 documentos completada con éxito.")
+
+def buscar_pelicula_por_titulo(titulo, proyeccion=None):
+    pattern = re.compile(f"^{re.escape(titulo)}$", re.IGNORECASE)
+    if proyeccion:
+        return collection.find_one({"titulo": pattern}, proyeccion)
+    return collection.find_one({"titulo": pattern})
 
 def preguntar_continuar(accion_repetir):
     while True:
@@ -173,18 +185,30 @@ def listar_peliculas():
 
 def buscar_por_comparacion():
     while True:
-        print("\n--- 3. BUSCAR POR DURACIÓN MAYOR A ($gt) ---")
+        print("\n--- 3. BUSCAR POR DURACIÓN (Operadores de Comparación) ---")
         try:
-            minutos = int(input("Ingresa la duración mínima en minutos [EJ: 130]: "))
+            minutos = int(input("Ingresa la duración en minutos [EJ: 130]: "))
+            print("Operadores: 1. Mayor a ($gt) [defecto] | 2. Menor a ($lt) | 3. Mayor o igual ($gte) | 4. Menor o igual ($lte) | 5. Diferente ($ne)")
+            op_sel = input("Selecciona operador (1-5) [Presiona Enter para 1]: ").strip()
+            
+            op_map = {
+                "1": ("$gt", "mayor a"),
+                "2": ("$lt", "menor a"),
+                "3": ("$gte", "mayor o igual a"),
+                "4": ("$lte", "menor o igual a"),
+                "5": ("$ne", "diferente de")
+            }
+            op_mongo, op_desc = op_map.get(op_sel, ("$gt", "mayor a"))
+            
             proyeccion = {"_id": 0, "titulo": 1, "duracion_minutos": 1}
-            peliculas = collection.find({"duracion_minutos": {"$gt": minutos}}, proyeccion)
+            peliculas = collection.find({"duracion_minutos": {op_mongo: minutos}}, proyeccion)
             encontradas = list(peliculas)
             
             if encontradas:
                 for p in encontradas:
                     print(f"- {p['titulo']} dura {p['duracion_minutos']} minutos.")
             else:
-                print("No se encontraron películas con esa duración.")
+                print(f"No se encontraron películas con duración {op_desc} {minutos} minutos.")
         except ValueError:
             print("Formato no válido, respete las indicaciones.")
         
@@ -235,7 +259,7 @@ def buscar_en_subdocumento():
         print("\n--- 6. BUSCAR POR SALA (Dentro del Array) ---")
         sala_buscar = input("Ingresa la sala a buscar [EJ: 'Sala 1']: ")
         proyeccion = {"_id": 0, "titulo": 1, "funciones": 1}
-        peliculas = collection.find({"funciones.sala": sala_buscar}, proyeccion)
+        peliculas = collection.find({"funciones.sala": re.compile(f"^{re.escape(sala_buscar)}$", re.IGNORECASE)}, proyeccion)
         encontradas = list(peliculas)
         if encontradas:
             for p in encontradas:
@@ -249,23 +273,24 @@ def buscar_en_subdocumento():
 def actualizar_raiz():
     while True:
         print("\n--- 7. ACTUALIZAR CAMPO RAÍZ (Género) ---")
-        titulo = input("Ingresa el título exacto de la película a actualizar [EJ: 'Inception']: ")
+        titulo = input("Ingresa el título de la película a actualizar [EJ: 'Inception']: ")
         
         # [REQUISITO DESTACADO] Buscar y mostrar el documento ANTES de modificar
-        antes = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "genero": 1})
+        antes = buscar_pelicula_por_titulo(titulo, {"_id": 0, "titulo": 1, "genero": 1})
         if not antes:
             print("No se encontró la película.")
             if not preguntar_continuar("Intentar con otra película"):
                 break
             continue
             
+        titulo_exacto = antes['titulo']
         print(f"[ESTADO ANTES]: {antes}")
         nuevo_genero = input("Ingresa el nuevo género [EJ: 'Acción y Suspenso']: ")
         
-        collection.update_one({"titulo": titulo}, {"$set": {"genero": nuevo_genero}})
+        collection.update_one({"titulo": titulo_exacto}, {"$set": {"genero": nuevo_genero}})
         
         # [REQUISITO DESTACADO] Buscar y mostrar el documento DESPUÉS de modificar
-        despues = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "genero": 1})
+        despues = collection.find_one({"titulo": titulo_exacto}, {"_id": 0, "titulo": 1, "genero": 1})
         print(f"[ESTADO DESPUÉS]: {despues}")
         print("¡El género ha sido actualizado!")
             
@@ -274,11 +299,11 @@ def actualizar_raiz():
 
 def actualizar_subdocumento():
     while True:
-        print("\n--- 8. ACTUALIZAR SUBDOCUMENTO (Precio General) ---")
-        titulo = input("Ingresa el título exacto de la película [EJ: 'The Matrix']: ")
+        print("\n--- 8. ACTUALIZAR PRECIO (Subdocumento) ---")
+        titulo = input("Ingresa el título de la película [EJ: 'The Matrix']: ")
         
         # [REQUISITO DESTACADO] Buscar y mostrar el documento ANTES de modificar
-        antes = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "entradas.precio_general": 1})
+        antes = buscar_pelicula_por_titulo(titulo, {"_id": 0, "titulo": 1, "entradas": 1, "funciones": 1})
         if not antes:
             print("No se encontró la película.")
             if not preguntar_continuar("Intentar con otra película"):
@@ -286,34 +311,51 @@ def actualizar_subdocumento():
             continue
             
         print(f"[ESTADO ANTES]: {antes}")
+        print("\nOpciones de actualización:")
+        print("1. Modificar precio general ($set en subdocumento)")
+        print("2. Agregar nueva función ($push en array)")
+        sub_opcion = input("Selecciona opción (1 o 2) [Por defecto: 1]: ").strip()
+        
+        titulo_exacto = antes['titulo']
+        
         try:
-            nuevo_precio = int(input("Ingresa el nuevo precio general [EJ: 4900]: "))
-            collection.update_one({"titulo": titulo}, {"$set": {"entradas.precio_general": nuevo_precio}})
+            if sub_opcion == "2":
+                sala = input("Nombre de la sala [EJ: 'Sala 6']: ").strip()
+                horario = input("Horario (HH:MM) [EJ: '20:00']: ").strip()
+                idioma = input("Idioma [EJ: 'Subtitulada']: ").strip()
+                nueva_funcion = {"sala": sala, "horario": horario, "idioma": idioma}
+                
+                collection.update_one({"titulo": titulo_exacto}, {"$push": {"funciones": nueva_funcion}})
+                print(f"¡Nueva función agregada correctamente con $push a '{titulo_exacto}'!")
+            else:
+                nuevo_precio = int(input("Ingresa el nuevo precio general [EJ: 4900]: "))
+                collection.update_one({"titulo": titulo_exacto}, {"$set": {"entradas.precio_general": nuevo_precio}})
+                print(f"¡Precio general actualizado correctamente con $set!")
             
             # [REQUISITO DESTACADO] Buscar y mostrar el documento DESPUÉS de modificar
-            despues = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "entradas.precio_general": 1})
+            despues = collection.find_one({"titulo": titulo_exacto}, {"_id": 0, "titulo": 1, "entradas": 1, "funciones": 1})
             print(f"[ESTADO DESPUÉS]: {despues}")
-            print("¡Precio general actualizado!")
         except ValueError:
             print("Formato no válido, respete las indicaciones.")
             
-        if not preguntar_continuar("Actualizar el precio de otra película"):
+        if not preguntar_continuar("Actualizar otra película"):
             break
 
 def eliminar_documento():
     while True:
         print("\n--- 9. ELIMINAR PELÍCULA ---")
-        titulo = input("Ingresa el título exacto de la película a eliminar [EJ: 'Shrek']: ")
+        titulo = input("Ingresa el título de la película a eliminar [EJ: 'Shrek']: ")
         
         # [REQUISITO DESTACADO] Mostrar el documento que se va a eliminar antes de procesar
-        pelicula_a_borrar = collection.find_one({"titulo": titulo}, {"_id": 0, "titulo": 1, "genero": 1, "duracion_minutos": 1})
+        pelicula_a_borrar = buscar_pelicula_por_titulo(titulo, {"_id": 0, "titulo": 1, "genero": 1, "duracion_minutos": 1})
         
         if pelicula_a_borrar:
+            titulo_exacto = pelicula_a_borrar['titulo']
             print(f"\n[DOCUMENTO ENCONTRADO]: {pelicula_a_borrar}")
-            confirmacion = input(f"¿Estás seguro de eliminar '{titulo}'? (si/no) [EJ: 'si']: ").lower()
+            confirmacion = input(f"¿Estás seguro de eliminar '{titulo_exacto}'? (si/no) [EJ: 'si']: ").strip().lower()
             
-            if confirmacion == "si":
-                collection.delete_one({"titulo": titulo})
+            if confirmacion in ["si", "sí", "s", "y", "yes"]:
+                collection.delete_one({"titulo": titulo_exacto})
                 print("Película eliminada correctamente.")
             else:
                 print("Operación cancelada.")
@@ -360,7 +402,7 @@ def menu_principal():
         print("="*45)
         print(" 1. Crear película")
         print(" 2. Listar películas")
-        print(" 3. Buscar por duración (> min)")
+        print(" 3. Buscar por duración (Operadores)")
         print(" 4. Buscar por título (Regex)")
         print(" 5. Buscar por rango de fechas")
         print(" 6. Buscar por sala")
